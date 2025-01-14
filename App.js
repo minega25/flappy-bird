@@ -1,5 +1,11 @@
 import React, { useEffect } from "react";
-import { Canvas, Image, useImage } from "@shopify/react-native-skia";
+import {
+  Canvas,
+  Group,
+  Image,
+  rotate,
+  useImage,
+} from "@shopify/react-native-skia";
 import { useWindowDimensions } from "react-native";
 import {
   useSharedValue,
@@ -8,6 +14,9 @@ import {
   withSequence,
   withRepeat,
   useFrameCallback,
+  useDerivedValue,
+  interpolate,
+  Extrapolation,
 } from "react-native-reanimated";
 import {
   Gesture,
@@ -16,6 +25,7 @@ import {
 } from "react-native-gesture-handler";
 
 const GRAVITY = 9.81 * 100;
+const JUMP_VELOCITY = -400;
 
 const App = () => {
   const { width, height } = useWindowDimensions();
@@ -27,11 +37,29 @@ const App = () => {
 
   const pipeOffset = 0;
   const x = useSharedValue(width);
-  const birdY = useSharedValue(0);
-  const birdYVelocity = useSharedValue(100);
+  const birdY = useSharedValue(height / 3);
+  const birdYVelocity = useSharedValue(0);
+  const birdTransform = useDerivedValue(() => {
+    return [
+      {
+        rotate: interpolate(
+          birdYVelocity.value,
+          [-400, 400],
+          [-0.5, 0.5],
+          Extrapolation.CLAMP
+        ),
+      },
+    ];
+  });
+  const birdOrigin = useDerivedValue(() => {
+    return {
+      x: width / 4 + 32,
+      y: birdY.value + 24,
+    };
+  });
 
   const gesture = Gesture.Tap().onStart(() => {
-    birdYVelocity.value = -200;
+    birdYVelocity.value = JUMP_VELOCITY;
   });
 
   useEffect(() => {
@@ -87,7 +115,15 @@ const App = () => {
           />
 
           {/* bird */}
-          <Image image={bird} width={64} height={48} x={width / 4} y={birdY} />
+          <Group origin={birdOrigin} transform={birdTransform}>
+            <Image
+              image={bird}
+              x={width / 4}
+              y={birdY}
+              width={64}
+              height={48}
+            />
+          </Group>
         </Canvas>
       </GestureDetector>
     </GestureHandlerRootView>
