@@ -1,13 +1,10 @@
-import React, { use, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Canvas,
-  Circle,
-  Fill,
   Group,
   Image,
   matchFont,
   Text,
-  useFont,
   useImage,
 } from "@shopify/react-native-skia";
 import { Platform, useWindowDimensions } from "react-native";
@@ -38,22 +35,27 @@ const PIPE_HEIGHT = 640;
 
 const App = () => {
   const [score, setScore] = useState(0);
+  const [isGameOver, setIsGameOver] = useState(false);
+  const [isStartOfGame, setIsStartOfGame] = useState(true);
   const { width, height } = useWindowDimensions();
 
-  const fontFamily = Platform.select({ ios: 'Helvetica', default: 'serif' });
+  const fontFamily = Platform.select({ ios: "", default: "serif" });
   const fontStyle = {
     fontFamily,
     fontSize: 40,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   };
   const font = matchFont(fontStyle);
 
+  const readyToStart = useImage(require("./assets/sprites/message.png"));
   const background = useImage(require("./assets/sprites/background-night.png"));
   const bird = useImage(require("./assets/sprites/redbird-midflap.png"));
+  const gameOverImage = useImage(require("./assets/sprites/gameover.png"));
   const pipeBottom = useImage(require("./assets/sprites/pipe-red.png"));
   const pipeTop = useImage(require("./assets/sprites/pipe-red-top.png"));
   const ground = useImage(require("./assets/sprites/base.png"));
 
+  const startGame = useSharedValue(false);
   const pipeOffset = useSharedValue(0);
   const gameOver = useSharedValue(false);
   const x = useSharedValue(width);
@@ -61,7 +63,7 @@ const App = () => {
   const birdYVelocity = useSharedValue(0);
 
   useEffect(() => {
-    moveTheMap();
+    if (!isStartOfGame) moveTheMap();
   }, []);
 
   const birdPos = {
@@ -80,6 +82,7 @@ const App = () => {
 
   const birdCenterX = useDerivedValue(() => birdPos.x + 50);
   const birdCenterY = useDerivedValue(() => birdY.value + 40);
+
   const obstacles = useDerivedValue(() => {
     const allObstacles = [];
 
@@ -122,7 +125,7 @@ const App = () => {
     () => x.value,
     (current, previous) => {
       // Randomize pipe offset
-      if (current <= -100 && previous>= -100) {
+      if (current <= -100 && previous >= -100) {
         pipeOffset.value = Math.floor(Math.random() * 400) - 200;
       }
       const middle = birdPos.x;
@@ -165,14 +168,27 @@ const App = () => {
   useAnimatedReaction(
     () => gameOver.value,
     (current, previous) => {
+      if (current !== isGameOver) {
+        runOnJS(setIsGameOver)(current);
+      }
       if (current && !previous) {
         cancelAnimation(x);
       }
     }
   );
 
+  useAnimatedReaction(
+    () => startGame.value,
+    (current, previous) => {
+      if (current && !previous) {
+        runOnJS(moveTheMap)();
+        runOnJS(setIsStartOfGame)(false);
+      }
+    }
+  );
+
   useFrameCallback(({ timeSincePreviousFrame: dt }) => {
-    if (!dt || gameOver.value) return;
+    if (!dt || gameOver.value || !startGame.value) return;
 
     birdY.value = birdY.value + (birdYVelocity.value * dt) / 1000;
     birdYVelocity.value = birdYVelocity.value + (GRAVITY * dt) / 1000;
@@ -190,6 +206,7 @@ const App = () => {
       },
     ];
   });
+
   const birdOrigin = useDerivedValue(() => {
     return {
       x: width / 4 + 32,
@@ -211,6 +228,9 @@ const App = () => {
   }
 
   const gesture = Gesture.Tap().onStart(() => {
+    if (!startGame.value) {
+      startGame.value = true;
+    }
     if (gameOver.value) {
       restartGame();
     } else {
@@ -224,6 +244,17 @@ const App = () => {
         <Canvas style={{ width, height }}>
           {/* background */}
           <Image image={background} fit="cover" width={width} height={height} />
+
+          {/* Start of game message */}
+          {isStartOfGame && (
+            <Image
+              image={readyToStart}
+              x={width / 2 - 360}
+              y={height / 2 - 200}
+              width={720}
+              height={400}
+            />
+          )}
 
           {/* pipe */}
           <Image
@@ -239,7 +270,7 @@ const App = () => {
             width={PIPE_WIDTH}
             height={PIPE_HEIGHT}
             x={x}
-            y={bottomPipeY} 
+            y={bottomPipeY}
           />
 
           {/* ground */}
@@ -253,24 +284,45 @@ const App = () => {
           />
 
           {/* bird */}
-          <Group origin={birdOrigin} transform={birdTransform}>
-            <Image
-              image={bird}
-              x={birdPos.x}
-              y={birdY}
-              width={64}
-              height={48}
-            />
-          </Group>
+          {!isStartOfGame && (
+            <Group origin={birdOrigin} transform={birdTransform}>
+              <Image
+                image={bird}
+                x={birdPos.x}
+                y={birdY}
+                width={64}
+                height={48}
+              />
+            </Group>
+          )}
 
+          {isGameOver && (
+            <>
+              <Image
+                image={gameOverImage}
+                x={width / 2 - 180}
+                y={height / 2 - 100}
+                width={360}
+                height={48}
+              />
+              <Text
+                x={width / 2 - 120}
+                y={height / 2}
+                text="Tap to restart"
+                font={font}
+              />
+            </>
+          )}
 
           {/* Score */}
-          <Text
-            x={width / 2 - 30}
-            y={100}
-            text={score.toString()}
-            font={font}
-          />
+          {!isStartOfGame && (
+            <Text
+              x={width / 2 - 30}
+              y={100}
+              text={score.toString()}
+              font={font}
+            />
+          )}
         </Canvas>
       </GestureDetector>
     </GestureHandlerRootView>
