@@ -3,8 +3,8 @@ import {
   Canvas,
   Group,
   Image,
-  matchFont,
   Text,
+  useFont,
   useImage,
 } from "@shopify/react-native-skia";
 import { Platform, useWindowDimensions } from "react-native";
@@ -39,13 +39,7 @@ const App = () => {
   const [isStartOfGame, setIsStartOfGame] = useState(true);
   const { width, height } = useWindowDimensions();
 
-  const fontFamily = Platform.select({ ios: "", default: "serif" });
-  const fontStyle = {
-    fontFamily,
-    fontSize: 40,
-    fontWeight: "bold",
-  };
-  const font = matchFont(fontStyle);
+  const font = useFont(require("./assets/fonts/PressStart2P-Regular.ttf"), 20);
 
   const readyToStart = useImage(require("./assets/sprites/message.png"));
   const background = useImage(require("./assets/sprites/background-night.png"));
@@ -80,8 +74,8 @@ const App = () => {
     );
   };
 
-  const birdCenterX = useDerivedValue(() => birdPos.x + 50);
-  const birdCenterY = useDerivedValue(() => birdY.value + 40);
+  const birdCenterX = useDerivedValue(() => birdPos.x + 64);
+  const birdCenterY = useDerivedValue(() => birdY.value + 48);
 
   const obstacles = useDerivedValue(() => {
     const allObstacles = [];
@@ -105,21 +99,6 @@ const App = () => {
     return allObstacles;
   });
 
-  const isPointInsideObstacle = (point, rect) => {
-    "worklet";
-    if (gameOver.value) {
-      return false;
-    }
-    if (
-      point.x >= rect.x &&
-      point.x <= rect.x + rect.w &&
-      point.y >= rect.y &&
-      point.y <= rect.y + rect.h
-    ) {
-      return true;
-    }
-  };
-
   // Scoring System
   useAnimatedReaction(
     () => x.value,
@@ -141,6 +120,21 @@ const App = () => {
   );
 
   // Collision detection
+  const isPointInsideObstacle = (point, rect) => {
+    "worklet";
+    if (gameOver.value) {
+      return false;
+    }
+    if (
+      point.x >= rect.x &&
+      point.x <= rect.x + rect.w &&
+      point.y >= rect.y &&
+      point.y <= rect.y + rect.h
+    ) {
+      return true;
+    }
+  };
+
   useAnimatedReaction(
     () => birdY.value,
     (current, previous) => {
@@ -298,26 +292,27 @@ const App = () => {
 
           {isGameOver && (
             <>
+              <Text
+                x={width / 2 - 85}
+                y={height / 2 - 50}
+                text={`Score: ${score}
+                `}
+                font={font}
+              />
               <Image
                 image={gameOverImage}
                 x={width / 2 - 180}
-                y={height / 2 - 100}
+                y={height / 2}
                 width={360}
                 height={48}
-              />
-              <Text
-                x={width / 2 - 120}
-                y={height / 2}
-                text="Tap to restart"
-                font={font}
               />
             </>
           )}
 
           {/* Score */}
-          {!isStartOfGame && (
+          {!isGameOver && !isStartOfGame && (
             <Text
-              x={width / 2 - 30}
+              x={width / 2 - 20}
               y={100}
               text={score.toString()}
               font={font}
